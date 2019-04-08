@@ -126,11 +126,12 @@ int main(void) {
     if (newline_ptr != NULL) {
       *newline_ptr = '\0';
     }
-    printf("read line %s\n", curr);
+    //    printf("read line %s\n", curr);
     if ((res = strcmp(curr, quit)) == 0) {
       break;
     }
-    printf("%d\n", res);
+    system(curr);
+    //    printf("%d\n", res);
     printf("Enter commands to evaluate. Enter q to exit.\n");
   }
 
