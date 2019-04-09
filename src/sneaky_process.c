@@ -6,7 +6,6 @@
  *
  */
 
-#define BUF_SIZE 2
 
 #include <error.h>
 #include <stdio.h>
