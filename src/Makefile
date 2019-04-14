@@ -8,7 +8,7 @@ PWD := $(shell pwd)
 
 .PHONY: build clean clobber
 
-build:
+build: sneaky_process
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules  
 
 clean:
