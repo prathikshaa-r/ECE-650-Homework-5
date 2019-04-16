@@ -3,7 +3,9 @@
  * Date: March 20, 2019
  * File Name: sneaky_processs.c
  * Description:
- *
+ * Loads sneaky_mod.ko
+ * Waits for user to enter q.
+ * Unloads sneaky_mod
  */
 
 #include <error.h>

