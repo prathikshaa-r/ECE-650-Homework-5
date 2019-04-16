@@ -1,0 +1,24 @@
+Module                  Size  Used by
+vmw_vsock_vmci_transport    32768  1
+vsock                  36864  2 vmw_vsock_vmci_transport
+vmw_balloon            20480  0
+joydev                 20480  0
+input_leds             16384  0
+serio_raw              16384  0
+shpchp                 36864  0
+vmw_vmci               65536  2 vmw_vsock_vmci_transport,vmw_balloon
+mac_hid                16384  0
+autofs4                40960  2
+psmouse               131072  0
+vmwgfx                233472  1
+ttm                    98304  1 vmwgfx
+vmxnet3                57344  0
+drm_kms_helper        155648  1 vmwgfx
+syscopyarea            16384  1 drm_kms_helper
+sysfillrect            16384  1 drm_kms_helper
+sysimgblt              16384  1 drm_kms_helper
+fb_sys_fops            16384  1 drm_kms_helper
+vmw_pvscsi             24576  3
+drm                   364544  4 ttm,drm_kms_helper,vmwgfx
+pata_acpi              16384  0
+fjes                   28672  0

